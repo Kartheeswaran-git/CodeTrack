@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "CodeTrack Pro",
+  "version": "1.0.0",
+  "description": "Student Coding & Placement Monitoring System",
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": [
+    "storage",
+    "notifications",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "https://github.com/*",
+    "https://www.codechef.com/*",
+    "https://codeforces.com/*",
+    "https://www.hackerrank.com/*",
+    "https://www.geeksforgeeks.org/*"
+  ],
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/*",
+        "https://github.com/*",
+        "https://www.codechef.com/*",
+        "https://codeforces.com/*",
+        "https://www.hackerrank.com/*",
+        "https://www.geeksforgeeks.org/*"
+      ],
+      "js": ["src/content.ts"]
+    }
+  ]
+}
