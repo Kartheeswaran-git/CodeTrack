@@ -114,7 +114,6 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/tasks', icon: FileText, label: 'Tasks' },
-    { path: '/resume', icon: Briefcase, label: 'Resume' },
     { path: '/profile', icon: User, label: 'Profile' },
   ]
 
@@ -494,138 +493,6 @@ const TasksList = () => {
     </div>
   )
 }
-
-const ResumeLink = () => {
-  const [driveLink, setDriveLink] = useState("")
-  const [inputLink, setInputLink] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
-
-  const fetchResume = async () => {
-    const student = getStoredStudent()
-    if (!student) return
-
-    const { data, error } = await supabase.rpc('get_student_resume', {
-      p_student_id: student.id,
-      p_password: student.password
-    })
-
-    if (error) {
-      setError(error.message)
-    } else if (data && data.length > 0) {
-      setDriveLink(data[0].file_url)
-      setInputLink(data[0].file_url)
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    void fetchResume()
-  }, [])
-
-  const handleSaveLink = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    
-    const student = getStoredStudent()
-    if (!student) return
-
-    const { error } = await supabase.rpc('update_student_resume', {
-      p_student_id: student.id,
-      p_password: student.password,
-      p_file_url: inputLink.trim()
-    })
-
-    if (error) {
-      alert(`Error saving: ${error.message}`)
-    } else {
-      setDriveLink(inputLink.trim())
-      setEditing(false)
-      alert("Resume link updated successfully!")
-    }
-    setSaving(false)
-  }
-
-  if (loading) return <div className="text-center p-8 text-sm text-zinc-500">Loading resume details...</div>
-  if (error) return <div className="text-red-500 text-sm text-center p-4">Error: {error}</div>
-
-  return (
-    <div className="space-y-4">
-      <h2 className="font-semibold text-lg text-zinc-800 dark:text-zinc-200">Resume Link</h2>
-      
-      {!editing && driveLink ? (
-        <Card className="p-4 shadow-sm border-zinc-200 dark:border-zinc-800 space-y-4">
-          <div className="flex items-center gap-3 bg-violet-50 dark:bg-violet-950/20 p-3 rounded-lg border border-violet-100 dark:border-violet-900/30 font-medium">
-            <Briefcase className="h-6 w-6 text-violet-600 dark:text-violet-400 shrink-0" />
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">My Resume Link</p>
-              <p className="text-[10px] text-zinc-500 truncate mt-0.5">{driveLink}</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <a 
-              href={driveLink} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="flex-1 bg-violet-600 text-white text-xs font-semibold py-2 px-3 rounded-md text-center shadow hover:bg-violet-700 transition"
-            >
-              Open Resume Link
-            </a>
-            <Button 
-              variant="outline" 
-              onClick={() => setEditing(true)} 
-              className="text-xs py-2"
-            >
-              Edit Link
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <Card className="p-4 shadow-sm border-zinc-200 dark:border-zinc-800 space-y-4">
-          <form onSubmit={handleSaveLink} className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Enter Resume Google Drive Link</label>
-              <Input 
-                required
-                type="url"
-                placeholder="https://drive.google.com/file/d/..."
-                value={inputLink}
-                onChange={(e) => setInputLink(e.target.value)}
-                className="text-xs py-1.5"
-              />
-            </div>
-            
-            <div className="flex gap-2 justify-end">
-              {driveLink && (
-                <Button 
-                  variant="outline" 
-                  type="button" 
-                  onClick={() => {
-                    setInputLink(driveLink)
-                    setEditing(false)
-                  }}
-                  className="text-xs py-1.5"
-                >
-                  Cancel
-                </Button>
-              )}
-              <Button 
-                type="submit" 
-                disabled={saving}
-                className="text-xs py-1.5"
-              >
-                {saving ? "Saving..." : "Save Link"}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      )}
-    </div>
-  )
-}
 const StudentProfile = () => {
   const [profile, setProfile] = useState<{
     student_id: string;
@@ -650,6 +517,13 @@ const StudentProfile = () => {
   const [changingPassword, setChangingPassword] = useState(false)
   const [pwdForm, setPwdForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" })
   const [pwdSaving, setPwdSaving] = useState(false)
+
+  // Resume link states
+  const [driveLink, setDriveLink] = useState("")
+  const [inputLink, setInputLink] = useState("")
+  const [resumeLoading, setResumeLoading] = useState(true)
+  const [resumeSaving, setResumeSaving] = useState(false)
+  const [editingResume, setEditingResume] = useState(false)
 
   const [form, setForm] = useState({
     phone: "",
@@ -687,6 +561,50 @@ const StudentProfile = () => {
 
     void fetchProfile()
   }, [editing])
+
+  // Fetch resume link
+  useEffect(() => {
+    const fetchResume = async () => {
+      const student = getStoredStudent()
+      if (!student) return
+
+      const { data, error } = await supabase.rpc('get_student_resume', {
+        p_student_id: student.id,
+        p_password: student.password
+      })
+
+      if (!error && data && data.length > 0) {
+        setDriveLink(data[0].file_url)
+        setInputLink(data[0].file_url)
+      }
+      setResumeLoading(false)
+    }
+
+    void fetchResume()
+  }, [])
+
+  const handleSaveResumeLink = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setResumeSaving(true)
+    
+    const student = getStoredStudent()
+    if (!student) return
+
+    const { error } = await supabase.rpc('update_student_resume', {
+      p_student_id: student.id,
+      p_password: student.password,
+      p_file_url: inputLink.trim()
+    })
+
+    if (error) {
+      alert(`Error saving: ${error.message}`)
+    } else {
+      setDriveLink(inputLink.trim())
+      setEditingResume(false)
+      alert("Resume link updated successfully!")
+    }
+    setResumeSaving(false)
+  }
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -896,6 +814,79 @@ const StudentProfile = () => {
           </form>
         </Card>
       )}
+
+      {/* Resume Link Section */}
+      {!resumeLoading && (
+        <Card className="p-4 shadow-sm border-zinc-200 dark:border-zinc-800 space-y-3">
+          <p className="font-semibold text-xs text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Briefcase className="h-3.5 w-3.5" />
+            Resume Link
+          </p>
+          
+          {!editingResume && driveLink ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 bg-violet-50 dark:bg-violet-950/20 p-3 rounded-lg border border-violet-100 dark:border-violet-900/30">
+                <div className="overflow-hidden">
+                  <p className="text-[10px] text-zinc-500 truncate">{driveLink}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <a 
+                  href={driveLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex-1 bg-violet-600 text-white text-xs font-semibold py-2 px-3 rounded-md text-center shadow hover:bg-violet-700 transition"
+                >
+                  Open Resume
+                </a>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setEditingResume(true)} 
+                  className="text-xs py-2"
+                >
+                  Edit Link
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveResumeLink} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Google Drive Link</label>
+                <Input 
+                  required
+                  type="url"
+                  placeholder="https://drive.google.com/file/d/..."
+                  value={inputLink}
+                  onChange={(e) => setInputLink(e.target.value)}
+                  className="text-xs py-1.5"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                {driveLink && (
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    onClick={() => {
+                      setInputLink(driveLink)
+                      setEditingResume(false)
+                    }}
+                    className="text-xs py-1.5"
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button 
+                  type="submit" 
+                  disabled={resumeSaving}
+                  className="text-xs py-1.5"
+                >
+                  {resumeSaving ? "Saving..." : "Save Link"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
     </div>
   )
 }
@@ -916,7 +907,7 @@ const App = () => {
         
         <Route path="/dashboard" element={<MainLayout><StudentDashboard /></MainLayout>} />
         <Route path="/tasks" element={<MainLayout><TasksList /></MainLayout>} />
-        <Route path="/resume" element={<MainLayout><ResumeLink /></MainLayout>} />
+
         <Route path="/profile" element={<MainLayout><StudentProfile /></MainLayout>} />
       </Routes>
     </MemoryRouter>
